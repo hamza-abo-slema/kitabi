@@ -32,10 +32,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
       - name: Get deployed URL
         id: url
         run: |
@@ -44,18 +40,145 @@ jobs:
           REPO_NAME="${REPO##*/}"
           echo "url=https://${OWNER}.github.io/${REPO_NAME}" >> $GITHUB_OUTPUT
 
-      - name: Install @pwabuilder/cli
-        run: npm install -g @pwabuilder/cli
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        run: |
+          mkdir -p $ANDROID_HOME/cmdline-tools/latest
+          curl -sL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmd.zip
+          unzip -q cmd.zip -d $ANDROID_HOME/cmdline-tools
+          mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest 2>/dev/null || true
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1
+
+      - name: Generate minimal Android project
+        run: |
+          APP_URL="${{ steps.url.outputs.url }}"
+          APP_NAME="كتابي"
+          PKG="com.kitabi.app"
+
+          mkdir -p android-project/app/src/main/java/com/kitabi/app
+          mkdir -p android-project/app/src/main/res/values
+          mkdir -p android-project/gradle/wrapper
+
+          cat > android-project/settings.gradle << 'EOF'
+          rootProject.name = 'Kitabi'
+          include ':app'
+          EOF
+
+          cat > android-project/build.gradle << 'EOF'
+          buildscript {
+            repositories { google() mavenCentral() }
+            dependencies { classpath 'com.android.tools.build:gradle:8.2.0' }
+          }
+          allprojects {
+            repositories { google() mavenCentral() }
+          }
+          EOF
+
+          cat > android-project/app/build.gradle << 'EOF'
+          apply plugin: 'com.android.application'
+          android {
+            namespace 'com.kitabi.app'
+            compileSdk 34
+            defaultConfig {
+              applicationId 'com.kitabi.app'
+              minSdk 21
+              targetSdk 34
+              versionCode 1
+              versionName '1.0'
+            }
+            buildTypes {
+              release {
+                minifyEnabled false
+                proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+              }
+            }
+          }
+          dependencies {
+            implementation 'androidx.appcompat:appcompat:1.6.1'
+            implementation 'androidx.webkit:webkit:1.9.0'
+          }
+          EOF
+
+          cat > android-project/app/src/main/AndroidManifest.xml << 'MANIFEST'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.INTERNET" />
+            <application
+              android:allowBackup="true"
+              android:label="كتابي"
+              android:supportsRtl="true"
+              android:usesCleartextTraffic="true"
+              android:theme="@style/AppTheme">
+              <activity
+                android:name=".MainActivity"
+                android:exported="true">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN" />
+                  <category android:name="android.intent.category.LAUNCHER" />
+                </intent-filter>
+              </activity>
+            </application>
+          </manifest>
+          MANIFEST
+
+          cat > android-project/app/src/main/res/values/styles.xml << 'STYLES'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+            <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+              <item name="android:windowBackground">#0d1117</item>
+              <item name="colorPrimary">#1f6feb</item>
+            </style>
+          </resources>
+          STYLES
+
+          cat > android-project/app/src/main/java/com/kitabi/app/MainActivity.java << 'JAVA'
+          package com.kitabi.app;
+
+          import android.os.Bundle;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.webkit.WebSettings;
+          import androidx.appcompat.app.AppCompatActivity;
+
+          public class MainActivity extends AppCompatActivity {
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+              super.onCreate(savedInstanceState);
+              String url = getIntent().getStringExtra("url");
+              if (url == null) url = "APP_URL_PLACEHOLDER";
+              WebView webView = new WebView(this);
+              setContentView(webView);
+              WebSettings settings = webView.getSettings();
+              settings.setJavaScriptEnabled(true);
+              settings.setDomStorageEnabled(true);
+              settings.setAllowFileAccess(true);
+              settings.setMediaPlaybackRequiresUserGesture(false);
+              webView.setWebViewClient(new WebViewClient());
+              webView.loadUrl(url);
+            }
+          }
+          JAVA
+          sed -i "s|APP_URL_PLACEHOLDER|$APP_URL|g" android-project/app/src/main/java/com/kitabi/app/MainActivity.java
+
+          cd android-project
+          gradle wrapper --gradle-version 8.2
 
       - name: Build APK
         run: |
-          mkdir -p final-apk
-          npx pwabuilder build "${{ steps.url.outputs.url }}" \
-            --android \
-            --output final-apk 2>&1
-          echo "--- Build output ---"
-          find . -name "*.apk" -type f 2>/dev/null
-          find . -name "*.aab" -type f 2>/dev/null
-          find . -name "*.apks" -type f 2>/dev/null
-          ls -la final-apk/ 2>/dev/null || echo "Directory empty"
-          find . -type d -name "android" -o -type d -name "apk" 2>/dev/null
+          cd android-project
+          ./gradlew assembleRelease
+          mkdir -p ../final-apk
+          find . -name "*.apk" -exec cp {} ../final-apk/ \;
+          ls -la ../final-apk/
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kitabi-apk
+          path: final-apk/
