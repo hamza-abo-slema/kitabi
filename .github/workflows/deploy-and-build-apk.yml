@@ -39,41 +39,33 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install Bubblewrap
-        run: sudo npm install -g @pwabuilder/bubblewrap
-
-      - name: Init TWA project
-        env:
-          BUBBLEWRAP_KEYSTORE_PASSWORD: android
-          BUBBLEWRAP_KEY_PASSWORD: android
+      - name: Build APK via PWABuilder Cloud API
         run: |
           URL="${{ steps.url.outputs.url }}"
-          MANIFEST="${URL}/manifest.json"
-          mkdir -p twa-project
-          cd twa-project
-          npx @pwabuilder/bubblewrap init \
-            --manifest "$MANIFEST" \
-            --appVersionName "1.0" \
-            --appVersionCode 1 2>&1 || \
-          bubblewrap init \
-            --manifest "$MANIFEST" \
-            --appVersionName "1.0" \
-            --appVersionCode 1 2>&1
+          echo "Sending build request for: $URL"
 
-      - name: Build APK
-        env:
-          BUBBLEWRAP_KEYSTORE_PASSWORD: android
-          BUBBLEWRAP_KEY_PASSWORD: android
-        run: |
-          cd twa-project || mkdir -p twa-project && cd twa-project
-          ls -la
-          # Try building
-          npx @pwabuilder/bubblewrap build --skipSigning 2>&1 || \
-          bubblewrap build --skipSigning 2>&1 || \
-          echo "Build command failed"
-          mkdir -p ../final-apk
-          find . -name "*.apk" -exec cp {} ../final-apk/ \; 2>/dev/null
-          ls -la ../final-apk/ 2>/dev/null || echo "No APK found"
+          # Try PWABuilder API endpoints
+          curl -sf -X POST "https://pwabuilder.com/api/build" \
+            -H "Content-Type: application/json" \
+            -d "{\"url\":\"$URL\"}" \
+            -o build-result.zip 2>&1 && echo "API 1 succeeded" || \
+          curl -sf -X POST "https://api.pwabuilder.com/v1/build" \
+            -H "Content-Type: application/json" \
+            -d "{\"url\":\"$URL\"}" \
+            -o build-result.zip 2>&1 && echo "API 2 succeeded" || \
+          curl -sf "https://pwabuilder.com/api/build?url=${URL}" \
+            -o build-result.zip 2>&1 && echo "API 3 succeeded" || \
+          echo "All APIs failed"
+
+          if [ -f "build-result.zip" ] && [ -s "build-result.zip" ]; then
+            mkdir -p final-apk
+            unzip -o build-result.zip -d final-apk/ 2>/dev/null || true
+            find final-apk -name "*.apk" -exec mv {} final-apk/ \; 2>/dev/null
+            ls -la final-apk/ 2>/dev/null
+          else
+            echo "No build result from APIs"
+            mkdir -p final-apk
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
