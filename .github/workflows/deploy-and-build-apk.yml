@@ -33,22 +33,87 @@ jobs:
         run: |
           echo "url=https://$(echo ${{ github.repository }} | cut -d/ -f1).github.io/$(echo ${{ github.repository }} | cut -d/ -f2)" >> $GITHUB_OUTPUT
 
-      - name: Build APK via PWABuilder CLI
+      - name: Build APK via PWABuilder Android Build Box
         run: |
           URL="${{ steps.url.outputs.url }}"
+          MANIFEST="${URL}/manifest.json"
           echo "Building APK for: $URL"
-          
-          npm install -g @pwabuilder/cli 2>&1
-          mkdir -p output
-          
-          npx pwabuilder build "$URL" --android --output output 2>&1 || \
-          npx @pwabuilder/cli build "$URL" --android --output output 2>&1 || \
-          echo "Both build attempts completed"
+          mkdir -p output project
 
-          echo "=== Searching for APK files ==="
-          find . -name "*.apk" -type f 2>/dev/null
-          find output -type f 2>/dev/null
-          ls -laR output/ 2>/dev/null
+          # Use PWABuilder Android build box Docker image
+          docker run --rm \
+            -v $PWD/project:/project \
+            -v $PWD/output:/output \
+            -e MANIFEST_URL="$MANIFEST" \
+            -e URL="$URL" \
+            ghcr.io/pwa-builder/android-build-box:latest \
+            bash -c '
+              echo "=== Setting up project ==="
+              cd /project
+              
+              # Initialize with Bubblewrap
+              npx @bubblewrap/cli init \
+                --manifest="$MANIFEST" \
+                --appVersionName="1.0" \
+                --appVersionCode=1 \
+                --directory=/project 2>&1 || \
+              echo "Init may have failed interactively"
+              
+              # Check if twa-manifest exists
+              if [ ! -f "twa-manifest.json" ]; then
+                echo "Creating twa-manifest manually..."
+                HOST=$(echo "$URL" | sed "s|https://||" | sed "s|/.*||")
+                cat > twa-manifest.json << EOF
+                {
+                  "host": "$HOST",
+                  "startUrl": "/",
+                  "name": "Kitabi",
+                  "shortName": "Kitabi",
+                  "launcherName": "Kitabi",
+                  "display": "standalone",
+                  "appVersionName": "1.0",
+                  "appVersionCode": 1,
+                  "backgroundColor": "#0d1117",
+                  "themeColor": "#0d1117",
+                  "orientation": "portrait",
+                  "icons": [],
+                  "signingKey": { "path": "", "alias": "" },
+                  "fallbackType": "customtabs"
+                }
+                EOF
+              fi
+              
+              # Generate project from twa-manifest
+              echo "Generating Android project..."
+              npx @bubblewrap/core generate --input twa-manifest.json --output /project 2>&1 || \
+              npx @bubblewrap/cli update --manifest=/project/twa-manifest.json 2>&1 || \
+              npx @bubblewrap/cli init --manifest="$MANIFEST" --directory=/project 2>&1
+              
+              ls -la /project/
+              
+              # Build
+              echo "Building APK..."
+              cd /project
+              if [ -f "gradlew" ]; then
+                chmod +x gradlew
+                BUBBLEWRAP_KEYSTORE_PASSWORD=android \
+                BUBBLEWRAP_KEY_PASSWORD=android \
+                ./gradlew assembleRelease 2>&1 || true
+              else
+                echo "No gradlew found - trying bubblewrap build"
+                BUBBLEWRAP_KEYSTORE_PASSWORD=android \
+                BUBBLEWRAP_KEY_PASSWORD=android \
+                npx @bubblewrap/cli build --skipSigning 2>&1 || true
+              fi
+              
+              # Find and copy APK
+              echo "=== Searching for APK ==="
+              find /project -name "*.apk" -type f 2>/dev/null
+              find /project -name "*.apk" -exec cp {} /output/ \; 2>/dev/null
+            ' 2>&1 || echo "Docker build failed"
+
+          echo "=== Output files ==="
+          ls -la output/ 2>/dev/null || echo "No output files"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
