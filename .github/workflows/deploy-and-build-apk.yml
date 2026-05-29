@@ -44,36 +44,18 @@ jobs:
           REPO_NAME="${REPO##*/}"
           echo "url=https://${OWNER}.github.io/${REPO_NAME}" >> $GITHUB_OUTPUT
 
-      - name: Install PWABuilder CLI
+      - name: Install @pwabuilder/cli
         run: npm install -g @pwabuilder/cli
 
-      - name: Build Android package
-        run: |
-          mkdir -p apk-output
-          npx pwabuilder build \
-            --url "${{ steps.url.outputs.url }}" \
-            --android \
-            --output apk-output 2>&1 || true
-          find . -name "*.apk" -o -name "*.aab" -o -name "*.apks" 2>/dev/null | head -20
-
-      - name: Locate and upload APK
+      - name: Build APK
         run: |
           mkdir -p final-apk
-          found=$(find . -name "*.apk" -type f 2>/dev/null | head -1)
-          if [ -z "$found" ]; then
-            found=$(find . -name "*.aab" -type f 2>/dev/null | head -1)
-          fi
-          if [ -n "$found" ]; then
-            echo "Found: $found"
-            cp "$found" final-apk/
-          else
-            echo "No APK found - check build output"
-            ls -la apk-output/ 2>/dev/null || echo "apk-output empty"
-            find . -type d -maxdepth 3 2>/dev/null
-          fi
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: kitabi-apk
-          path: final-apk/
+          npx pwabuilder build "${{ steps.url.outputs.url }}" \
+            --android \
+            --output final-apk 2>&1
+          echo "--- Build output ---"
+          find . -name "*.apk" -type f 2>/dev/null
+          find . -name "*.aab" -type f 2>/dev/null
+          find . -name "*.apks" -type f 2>/dev/null
+          ls -la final-apk/ 2>/dev/null || echo "Directory empty"
+          find . -type d -name "android" -o -type d -name "apk" 2>/dev/null
