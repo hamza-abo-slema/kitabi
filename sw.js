@@ -1,10 +1,9 @@
-const CACHE = 'audioshield-v1';
+const CACHE = 'kitabi-v1';
 const URLS = [
   '/',
   'index.html',
   'css/style.css',
   'js/audio-engine.js',
-  'js/recorder-detector.js',
   'js/app.js',
   'manifest.json',
   'icon-192.svg',

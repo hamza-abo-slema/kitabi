@@ -1,7 +1,7 @@
 {
-  "name": "AudioShield - مشغل صوتي آمن",
-  "short_name": "AudioShield",
-  "description": "مشغل صوتي مع حماية ضد تسجيل الشاشة - Stereo phase cancellation",
+  "name": "كتابي - مشغل الكتاب الصوتي",
+  "short_name": "كتابي",
+  "description": "مشغل كتاب صوتي مع حماية عكس الطور ضد تسجيل الشاشة",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

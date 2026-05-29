@@ -1,18 +1,11 @@
 const engine = new AudioEngine();
-let detector = null;
 let progressInterval = null;
 
 const $ = id => document.getElementById(id);
 
 async function initApp() {
   await engine.init();
-
-  detector = new RecorderDetector((active, source) => {
-    engine.setAntiRecording(true);
-    $('status-badge').textContent = '⚠ Anti-Recording ACTIVE';
-    $('status-badge').className = 'badge badge-danger';
-    $('log').textContent += `[${source}] Screen recording detected → phase inversion engaged\n`;
-  });
+  engine.setAntiRecording(true);
 
   $('play-btn').addEventListener('click', () => {
     if (engine.isPlaying) {
@@ -31,18 +24,15 @@ async function initApp() {
     stopProgress();
   });
 
-  $('test-btn').addEventListener('click', () => {
-    const active = !engine.antiRecActive;
+  $('phase-toggle').addEventListener('change', () => {
+    const active = $('phase-toggle').checked;
     engine.setAntiRecording(active);
-    detector.recording = active;
     if (active) {
-      $('status-badge').textContent = '⚠ Anti-Recording ACTIVE (test)';
-      $('status-badge').className = 'badge badge-danger';
-      $('log').textContent += '[test] Manual anti-recording enabled\n';
-    } else {
-      $('status-badge').textContent = '✅ Normal Playback';
+      $('status-badge').textContent = '🛡️ حماية عكس الطور نشطة';
       $('status-badge').className = 'badge badge-success';
-      $('log').textContent += '[test] Manual anti-recording disabled\n';
+    } else {
+      $('status-badge').textContent = '⚠️ حماية عكس الطور معطلة';
+      $('status-badge').className = 'badge badge-danger';
     }
   });
 }
@@ -84,6 +74,5 @@ document.addEventListener('DOMContentLoaded', () => {
     $('controls').style.display = 'flex';
   }).catch(e => {
     $('loading').textContent = '❌ فشل تحميل الملف الصوتي';
-    $('log').textContent += '[error] Failed to load audio file\n';
   });
 });

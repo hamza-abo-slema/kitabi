@@ -82,45 +82,55 @@ progress::-moz-progress-bar { background: #58a6ff; border-radius: 4px; }
 .btn-danger { background: #da3633; border-color: #da3633; color: #fff; }
 .btn-danger:hover { background: #f85149; }
 .badge {
-  display: inline-block;
   padding: 6px 14px;
   border-radius: 20px;
   font-size: 13px;
   font-weight: 600;
   text-align: center;
-  margin: 0 auto 16px;
 }
 .badge-success { background: #1a7f37; color: #fff; }
 .badge-danger { background: #da3633; color: #fff; }
 #status-badge {
   display: block;
   width: fit-content;
+  margin: 0 auto 16px;
 }
-#log {
-  background: #0d1117;
-  border: 1px solid #30363d;
-  border-radius: 8px;
-  padding: 12px;
-  font-size: 12px;
-  font-family: 'Consolas', monospace;
-  height: 80px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  color: #8b949e;
-  margin-top: 4px;
+.toggle-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
 }
-.log-label {
-  font-size: 12px;
-  color: #8b949e;
-  margin-bottom: 4px;
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #e6edf3;
+  cursor: pointer;
+  user-select: none;
 }
-.test-note {
-  font-size: 12px;
-  color: #8b949e;
-  text-align: center;
-  margin: 12px 0;
+.toggle-label input { display: none; }
+.toggle-slider {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: #30363d;
+  border-radius: 12px;
+  transition: background .2s;
 }
-.btn-sm {
-  padding: 6px 14px;
-  font-size: 12px;
+.toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #8b949e;
+  border-radius: 50%;
+  transition: transform .2s, background .2s;
+}
+.toggle-label input:checked + .toggle-slider { background: #1f6feb; }
+.toggle-label input:checked + .toggle-slider::after {
+  transform: translateX(20px);
+  background: #fff;
 }
