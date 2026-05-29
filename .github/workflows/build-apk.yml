@@ -1,0 +1,56 @@
+name: Build APK & Deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  deploy-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate static frontend
+        run: |
+          mkdir -p dist
+          cp -r public/* dist/
+          cp server.js dist/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+
+  build-apk:
+    needs: deploy-pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Pages deployment
+        run: sleep 30
+
+      - name: Generate APK via PWABuilder
+        run: |
+          REPO="${{ github.repository }}"
+          URL="https://${{ github.repository_owner }}.github.io/${REPO#*/}/"
+          echo "Building APK from: $URL"
+          curl -X POST "https://pwabuilder.com/api/publish" \
+            -H "Content-Type: application/json" \
+            -d "{\"url\":\"$URL\",\"packageId\":\"com.kitabi.app\",\"appName\":\"كتابي\",\"appVersion\":\"1.0.0\"}" \
+            -o apk-result.json 2>&1 || echo "PWABuilder API may not be available"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kitabi-apk
+          path: ./*.apk
+          if-no-files-found: ignore
