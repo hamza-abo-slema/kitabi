@@ -120,24 +120,119 @@ jobs:
 
       - name: Build APK in Android Build Box
         run: |
+          URL="${{ steps.url.outputs.url }}"
           mkdir -p output
+
+          # Create the complete Android project in one step inside Docker
           docker run --rm \
-            -v $PWD/MyApp:/project \
             -v $PWD/output:/output \
             ghcr.io/pwa-builder/android-build-box:latest \
-            bash -c '
-              cd /project
-              echo "sdk.dir=/android/sdk" > local.properties
-              # Generate gradle wrapper
-              cd /project
-              gradle wrapper --gradle-version 8.2 2>&1
-              chmod +x gradlew
-              # Build release APK
-              ANDROID_HOME=/android/sdk ./gradlew assembleRelease 2>&1
-              # Find APK
-              find /project -name "*.apk" -exec cp {} /output/ \; 2>/dev/null
-              echo "Done building"
-            ' 2>&1 || echo "Build failed"
+            bash -e '
+              cd /tmp
+              mkdir -p MyApp/app/src/main/java/com/kitabi/app
+              mkdir -p MyApp/app/src/main/res/values
 
-          echo "=== Output ==="
-          ls -la output/ 2>/dev/null || echo "No output"
+              cat > MyApp/settings.gradle << EOF
+              rootProject.name = "Kitabi"
+              include ":app"
+              EOF
+
+              cat > MyApp/build.gradle << EOF
+              buildscript {
+                repositories { google() mavenCentral() }
+                dependencies { classpath "com.android.tools.build:gradle:8.2.0" }
+              }
+              allprojects { repositories { google() mavenCentral() } }
+              EOF
+
+              cat > MyApp/gradle.properties << EOF
+              org.gradle.jvmargs=-Xmx2048m
+              android.useAndroidX=true
+              EOF
+
+              cat > MyApp/app/build.gradle << EOF
+              apply plugin: "com.android.application"
+              android {
+                namespace "com.kitabi.app"
+                compileSdk 34
+                defaultConfig {
+                  applicationId "com.kitabi.app"
+                  minSdk 21
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0"
+                }
+                buildTypes { release { minifyEnabled false } }
+              }
+              dependencies { implementation "androidx.appcompat:appcompat:1.6.1" }
+              EOF
+
+              cat > MyApp/app/src/main/AndroidManifest.xml << "MANIFEST"
+              <?xml version="1.0" encoding="utf-8"?>
+              <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+                <uses-permission android:name="android.permission.INTERNET"/>
+                <application android:allowBackup="true" android:label="Kitabi" android:supportsRtl="true" android:usesCleartextTraffic="true" android:theme="@style/AppTheme">
+                  <activity android:name=".MainActivity" android:exported="true">
+                    <intent-filter>
+                      <action android:name="android.intent.action.MAIN"/>
+                      <category android:name="android.intent.category.LAUNCHER"/>
+                    </intent-filter>
+                  </activity>
+                </application>
+              </manifest>
+              MANIFEST
+
+              cat > MyApp/app/src/main/res/values/styles.xml << "XML"
+              <?xml version="1.0" encoding="utf-8"?>
+              <resources><style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar"><item name="android:windowBackground">#0d1117</item></style></resources>
+              XML
+
+              cat > MyApp/app/src/main/java/com/kitabi/app/MainActivity.java << "JAVA"
+              package com.kitabi.app;
+              import android.os.Bundle;
+              import android.webkit.WebView;
+              import android.webkit.WebViewClient;
+              import android.webkit.WebSettings;
+              import androidx.appcompat.app.AppCompatActivity;
+              public class MainActivity extends AppCompatActivity {
+                @Override
+                protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  WebView wv = new WebView(this);
+                  setContentView(wv);
+                  WebSettings s = wv.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+                  s.setMediaPlaybackRequiresUserGesture(false);
+                  wv.setWebViewClient(new WebViewClient());
+                  wv.loadUrl("URL_HERE");
+                }
+              }
+              JAVA
+              sed -i "s|URL_HERE|'"$URL"'|g" MyApp/app/src/main/java/com/kitabi/app/MainActivity.java
+
+              echo "=== Finding SDK ==="
+              SDK_PATH=""
+              for p in /android/sdk /usr/local/lib/android/sdk /opt/android-sdk "$ANDROID_HOME" "$ANDROID_SDK_ROOT"; do
+                if [ -n "$p" ] && [ -d "$p/platforms" ]; then
+                  SDK_PATH="$p"
+                  break
+                fi
+              done
+              echo "SDK: $SDK_PATH"
+              ls "$SDK_PATH/platforms/" 2>/dev/null || echo "No platforms"
+              ls "$SDK_PATH/build-tools/" 2>/dev/null || echo "No build-tools"
+
+              echo "sdk.dir=$SDK_PATH" > MyApp/local.properties
+
+              cd MyApp
+              echo "=== Building APK ==="
+              gradle assembleRelease --no-daemon 2>&1
+
+              echo "=== Collecting APK ==="
+              find . -name "*.apk" -exec cp {} /output/ \; 2>/dev/null
+              ls -la /output/
+            ' 2>&1 || echo "Docker command returned non-zero"
+
+          echo "=== Output directory ==="
+          ls -la output/ 2>/dev/null || echo "No output directory"
