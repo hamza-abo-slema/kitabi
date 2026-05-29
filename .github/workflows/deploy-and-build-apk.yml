@@ -33,26 +33,130 @@ jobs:
         run: |
           echo "url=https://$(echo ${{ github.repository }} | cut -d/ -f1).github.io/$(echo ${{ github.repository }} | cut -d/ -f2)" >> $GITHUB_OUTPUT
 
-      - name: Generate APK via Bubblewrap Docker
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Create Android project and build APK
         run: |
           URL="${{ steps.url.outputs.url }}"
-          mkdir -p output
-          docker run --rm -v $PWD/output:/output \
-            ghcr.io/googlechromelabs/bubblewrap:latest \
-            sh -c "
-              mkdir -p /project && cd /project
-              npx @pwabuilder/bubblewrap init \
-                --manifest '${URL}/manifest.json' \
-                --appVersionName '1.0' \
-                --appVersionCode 1 \
-                --directory .
-              npx @pwabuilder/bubblewrap build --skipSigning
-              find . -name '*.apk' -exec cp {} /output/ \;
-            " 2>&1 || echo "Docker build failed, trying alternative..."
-          ls -la output/ 2>/dev/null || echo "No output"
+          PKG="com.kitabi.audiobook"
+          ANDROID_HOME="/usr/local/lib/android/sdk"
+          
+          mkdir -p android-project/app/src/main/java/com/kitabi/audiobook
+          mkdir -p android-project/app/src/main/res/values
+          mkdir -p android-project/gradle/wrapper
+
+          cat > android-project/settings.gradle << 'GRADLE'
+          rootProject.name = 'Kitabi'
+          include ':app'
+          GRADLE
+
+          cat > android-project/build.gradle << 'GRADLE'
+          buildscript {
+            repositories { google() mavenCentral() }
+            dependencies { classpath 'com.android.tools.build:gradle:8.2.0' }
+          }
+          allprojects { repositories { google() mavenCentral() } }
+          GRADLE
+
+          cat > android-project/gradle.properties << 'GRADLE'
+          org.gradle.jvmargs=-Xmx2048m
+          android.useAndroidX=true
+          GRADLE
+
+          echo "sdk.dir=${ANDROID_HOME}" > android-project/local.properties
+
+          cat > android-project/app/build.gradle << 'GRADLE'
+          apply plugin: 'com.android.application'
+          android {
+            namespace 'com.kitabi.audiobook'
+            compileSdk 34
+            defaultConfig {
+              applicationId 'com.kitabi.audiobook'
+              minSdk 21
+              targetSdk 34
+              versionCode 1
+              versionName '1.0'
+            }
+            buildTypes {
+              release { minifyEnabled false }
+            }
+          }
+          dependencies {
+            implementation 'androidx.appcompat:appcompat:1.6.1'
+          }
+          GRADLE
+
+          cat > android-project/app/src/main/AndroidManifest.xml << 'MANIFEST'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.INTERNET"/>
+            <application android:allowBackup="true" android:label="Kitabi" android:supportsRtl="true" android:usesCleartextTraffic="true" android:theme="@style/AppTheme">
+              <activity android:name=".MainActivity" android:exported="true">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
+              </activity>
+            </application>
+          </manifest>
+          MANIFEST
+
+          cat > android-project/app/src/main/res/values/styles.xml << 'XML'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+            <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+              <item name="android:windowBackground">#0d1117</item>
+            </style>
+          </resources>
+          XML
+
+          cat > android-project/app/src/main/java/com/kitabi/audiobook/MainActivity.java << 'JAVA'
+          package com.kitabi.audiobook;
+          import android.os.Bundle;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.webkit.WebSettings;
+          import androidx.appcompat.app.AppCompatActivity;
+          public class MainActivity extends AppCompatActivity {
+            @Override
+            protected void onCreate(Bundle savedInstanceState) {
+              super.onCreate(savedInstanceState);
+              WebView wv = new WebView(this);
+              setContentView(wv);
+              WebSettings s = wv.getSettings();
+              s.setJavaScriptEnabled(true);
+              s.setDomStorageEnabled(true);
+              s.setMediaPlaybackRequiresUserGesture(false);
+              wv.setWebViewClient(new WebViewClient());
+              wv.loadUrl("URL_PLACEHOLDER");
+            }
+          }
+          JAVA
+
+          sed -i "s|URL_PLACEHOLDER|$URL|g" android-project/app/src/main/java/com/kitabi/audiobook/MainActivity.java
+
+      - name: Build APK
+        run: |
+          export ANDROID_HOME="/usr/local/lib/android/sdk"
+          export ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
+          cd android-project
+          wget -q https://services.gradle.org/distributions/gradle-8.2-bin.zip -O gradle.zip
+          unzip -q gradle.zip
+          GRADLE=$(echo gradle-8.2/bin/gradle)
+          $GRADLE wrapper --gradle-version 8.2
+          chmod +x gradlew
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
+          ./gradlew assembleRelease 2>&1
+          mkdir -p ../final-apk
+          find . -name "*.apk" -exec cp {} ../final-apk/ \;
+          ls -la ../final-apk/
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: kitabi-apk
-          path: output/
+          path: final-apk/
