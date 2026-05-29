@@ -118,54 +118,32 @@ jobs:
           }
           JAVA
 
-      - name: Setup Gradle wrapper
+      - name: Setup & Build APK
         run: |
-          curl -sL "https://raw.githubusercontent.com/gradle/gradle/master/gradlew" -o android/gradlew
-          curl -sL "https://raw.githubusercontent.com/gradle/gradle/master/gradlew.bat" -o android/gradlew.bat
-          chmod +x android/gradlew
+          # Check Android SDK
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls $ANDROID_HOME/platforms/ 2>/dev/null || echo "No platforms"
+          ls $ANDROID_HOME/build-tools/ 2>/dev/null || echo "No build-tools"
 
-          # Download gradle-wrapper.jar - use a minimal approach
-          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.2-bin.zip
-          networkTimeout=10000
-          validateDistributionUrl=true
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          EOF
-
-      - name: Check Android SDK
-        run: |
-          echo "JAVA_HOME: $JAVA_HOME"
-          echo "ANDROID_HOME: $ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
-          java -version 2>&1
-          ls -la $ANDROID_HOME/ 2>/dev/null || echo "No ANDROID_HOME"
-          ls -la $ANDROID_SDK_ROOT/ 2>/dev/null || echo "No ANDROID_SDK_ROOT"
-
-      - name: Install SDK components
-        run: |
-          SDKMANAGER=$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager
-          if [ ! -f "$SDKMANAGER" ]; then
-            SDKMANAGER=$ANDROID_HOME/tools/bin/sdkmanager
-          fi
-          if [ ! -f "$SDKMANAGER" ]; then
-            echo "Downloading cmdline-tools..."
-            curl -sLo cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-            unzip -q cmdline-tools.zip -d $ANDROID_HOME/cmdline-tools-tmp
-            mkdir -p $ANDROID_HOME/cmdline-tools/latest
-            mv $ANDROID_HOME/cmdline-tools-tmp/cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest/
-            rm -rf cmdline-tools.zip $ANDROID_HOME/cmdline-tools-tmp
+          # Install SDK components if needed
+          if [ ! -d "$ANDROID_HOME/platforms/android-34" ]; then
             SDKMANAGER=$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager
+            [ ! -f "$SDKMANAGER" ] && SDKMANAGER=$ANDROID_HOME/tools/bin/sdkmanager
+            if [ -f "$SDKMANAGER" ]; then
+              echo yes | $SDKMANAGER "platforms;android-34" "build-tools;34.0.0" 2>&1
+            fi
           fi
-          echo yes | $SDKMANAGER "platforms;android-34" "build-tools;34.0.0" 2>&1
 
-      - name: Build APK
-        run: |
+          # Download Gradle and use it directly (avoid wrapper bootstrap)
+          curl -sLo gradle-bin.zip https://services.gradle.org/distributions/gradle-8.2-bin.zip
+          unzip -q gradle-bin.zip
+          GRADLE_HOME=$PWD/gradle-8.2
+
           cd android
           echo "sdk.dir=$ANDROID_HOME" > local.properties
-          ./gradlew assembleRelease --stacktrace --no-daemon 2>&1
+
+          echo "=== Building APK ==="
+          $GRADLE_HOME/bin/gradle assembleRelease --no-daemon --stacktrace 2>&1
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
