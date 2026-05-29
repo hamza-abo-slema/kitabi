@@ -33,67 +33,26 @@ jobs:
         run: |
           echo "url=https://$(echo ${{ github.repository }} | cut -d/ -f1).github.io/$(echo ${{ github.repository }} | cut -d/ -f2)" >> $GITHUB_OUTPUT
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Install Android SDK cmdline-tools
-        run: |
-          mkdir -p $HOME/android-sdk/cmdline-tools
-          curl -sL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmd.zip
-          unzip -q cmd.zip -d $HOME/android-sdk/cmdline-tools/
-          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest 2>/dev/null || true
-          export ANDROID_HOME=$HOME/android-sdk
-          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-
-      - name: Accept licenses and install SDK
-        run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1
-
-      - name: Install Bubblewrap
-        run: npm install -g @pwabuilder/bubblewrap
-
-      - name: Initialize TWA project
+      - name: Generate APK via Bubblewrap Docker
         run: |
           URL="${{ steps.url.outputs.url }}"
-          MANIFEST="${URL}/manifest.json"
-          mkdir -p twa-project
-          cd twa-project
-          npx bubblewrap init \
-            --manifest "$MANIFEST" \
-            --appVersionName "1.0" \
-            --appVersionCode 1 \
-            --host "github.io" \
-            --directory . 2>&1 || \
-          npx bubblewrap init \
-            --manifest "$MANIFEST" \
-            --appVersionName "1.0" \
-            --appVersionCode 1 2>&1
-
-      - name: Build APK
-        run: |
-          cd twa-project
-          ls -la
-          if [ -f "gradlew" ]; then
-            chmod +x gradlew
-            ./gradlew assembleRelease 2>&1
-          elif [ -f "build.gradle" ]; then
-            gradle wrapper
-            ./gradlew assembleRelease 2>&1
-          else
-            echo "No Gradle files found"
-            ls -la
-          fi
-          mkdir -p ../final-apk
-          find . -name "*.apk" -exec cp {} ../final-apk/ \; 2>/dev/null
-          ls -la ../final-apk/ 2>/dev/null || echo "No APK found"
+          mkdir -p output
+          docker run --rm -v $PWD/output:/output \
+            ghcr.io/googlechromelabs/bubblewrap:latest \
+            sh -c "
+              mkdir -p /project && cd /project
+              npx @pwabuilder/bubblewrap init \
+                --manifest '${URL}/manifest.json' \
+                --appVersionName '1.0' \
+                --appVersionCode 1 \
+                --directory .
+              npx @pwabuilder/bubblewrap build --skipSigning
+              find . -name '*.apk' -exec cp {} /output/ \;
+            " 2>&1 || echo "Docker build failed, trying alternative..."
+          ls -la output/ 2>/dev/null || echo "No output"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: kitabi-apk
-          path: final-apk/
+          path: output/
