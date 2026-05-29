@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="32" fill="#0d1117"/>
+  <circle cx="96" cy="88" r="40" fill="none" stroke="#58a6ff" stroke-width="6"/>
+  <circle cx="96" cy="88" r="20" fill="none" stroke="#1f6feb" stroke-width="4"/>
+  <line x1="96" y1="48" x2="96" y2="28" stroke="#58a6ff" stroke-width="4" stroke-linecap="round"/>
+  <line x1="96" y1="128" x2="96" y2="148" stroke="#58a6ff" stroke-width="4" stroke-linecap="round"/>
+  <line x1="48" y1="88" x2="28" y2="88" stroke="#58a6ff" stroke-width="4" stroke-linecap="round"/>
+  <line x1="144" y1="88" x2="164" y2="88" stroke="#58a6ff" stroke-width="4" stroke-linecap="round"/>
+  <line x1="62" y1="54" x2="48" y2="40" stroke="#da3633" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+  <line x1="130" y1="122" x2="144" y2="136" stroke="#da3633" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+  <text x="96" y="170" text-anchor="middle" fill="#8b949e" font-size="14" font-family="sans-serif">SHIELD</text>
+</svg>

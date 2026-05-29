@@ -1,0 +1,5 @@
+# AudioShield - Web Audio Player
+.DS_Store
+Thumbs.db
+*.log
+node_modules/

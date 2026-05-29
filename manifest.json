@@ -1,0 +1,24 @@
+{
+  "name": "AudioShield - مشغل صوتي آمن",
+  "short_name": "AudioShield",
+  "description": "مشغل صوتي مع حماية ضد تسجيل الشاشة - Stereo phase cancellation",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    {
+      "src": "icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-192.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
