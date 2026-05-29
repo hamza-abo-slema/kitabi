@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="كتابي — أول تطبيق كتب صوتية مع حماية ذكية ضد تسجيل الشاشة">
+  <meta name="theme-color" content="#0b0b12">
+  <title>كتابي — الكتب الصوتية</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+</head>
+<body>
+  <a href="#main-content" class="sr-only" style="position:absolute;left:16px;top:8px;z-index:999;background:var(--primary);color:#fff;padding:8px 16px;border-radius:6px">تخطي إلى المحتوى الرئيسي</a>
+
+  <!-- Top Navigation -->
+  <nav class="top-nav" role="navigation" aria-label="القائمة العلوية">
+    <div class="logo" role="banner">
+      <span aria-hidden="true">📚</span>
+      <span>كتابي</span>
+    </div>
+    <div class="nav-search" role="search">
+      <span class="search-icon" aria-hidden="true">🔍</span>
+      <input type="search" id="globalSearch" placeholder="ابحث عن كتاب، مؤلف، أو راوي..." aria-label="بحث في المكتبة">
+    </div>
+    <div class="nav-actions">
+      <button class="btn-icon" id="themeToggle" aria-label="تبديل السمة">🌙</button>
+      <button class="btn-icon" id="notifBtn" aria-label="الإشعارات">🔔</button>
+      <button class="btn-primary" id="authBtn" aria-label="تسجيل الدخول">
+        <span aria-hidden="true">👤</span>
+        <span>دخول</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Protection Indicator -->
+  <div class="protection-indicator idle" id="protectionIndicator" role="status" aria-live="polite">
+    <span id="protectionIcon" aria-hidden="true">🛡️</span>
+    <span id="protectionText">الحماية نشطة</span>
+  </div>
+
+  <!-- Top Tabs (Desktop) -->
+  <nav class="top-tabs" role="tablist" aria-label="التنقل الرئيسي">
+    <button class="tab-btn active" data-tab="home" role="tab" aria-selected="true" aria-controls="page-home">
+      <span class="tab-icon" aria-hidden="true">🏠</span>
+      <span>الرئيسية</span>
+    </button>
+    <button class="tab-btn" data-tab="categories" role="tab" aria-selected="false" aria-controls="page-categories">
+      <span class="tab-icon" aria-hidden="true">📚</span>
+      <span>التصنيفات</span>
+    </button>
+    <button class="tab-btn" data-tab="profile" role="tab" aria-selected="false" aria-controls="page-profile">
+      <span class="tab-icon" aria-hidden="true">👤</span>
+      <span>أنا</span>
+    </button>
+  </nav>
+
+  <!-- Bottom Tabs (Mobile) -->
+  <nav class="bottom-tabs" role="tablist" aria-label="التنقل السفلي">
+    <button class="tab-btn active" data-tab="home" role="tab" aria-selected="true" aria-controls="page-home">
+      <span class="tab-icon" aria-hidden="true">🏠</span>
+      <span>الرئيسية</span>
+    </button>
+    <button class="tab-btn" data-tab="categories" role="tab" aria-selected="false" aria-controls="page-categories">
+      <span class="tab-icon" aria-hidden="true">📚</span>
+      <span>التصنيفات</span>
+    </button>
+    <button class="tab-btn" data-tab="subscription" role="tab" aria-selected="false" aria-controls="page-subscription">
+      <span class="tab-icon" aria-hidden="true">⭐</span>
+      <span>الاشتراك</span>
+    </button>
+    <button class="tab-btn" data-tab="profile" role="tab" aria-selected="false" aria-controls="page-profile">
+      <span class="tab-icon" aria-hidden="true">👤</span>
+      <span>أنا</span>
+    </button>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content" id="main-content">
+
+    <!-- Page: Home -->
+    <div class="page active" id="page-home" role="tabpanel" aria-label="الرئيسية">
+      <div id="homeContent"><div class="loading"><div class="spinner"></div> جارٍ التحميل...</div></div>
+    </div>
+
+    <!-- Page: Categories -->
+    <div class="page" id="page-categories" role="tabpanel" aria-label="التصنيفات">
+      <div class="page-header"><h1>التصنيفات</h1></div>
+      <div id="categoriesContent"><div class="loading"><div class="spinner"></div> جارٍ التحميل...</div></div>
+    </div>
+
+    <!-- Page: Profile / Me -->
+    <div class="page" id="page-profile" role="tabpanel" aria-label="أنا">
+      <div id="profileContent"><div class="loading"><div class="spinner"></div> جارٍ التحميل...</div></div>
+    </div>
+
+    <!-- Page: Book Detail -->
+    <div class="page" id="page-book" role="tabpanel" aria-label="تفاصيل الكتاب">
+      <div id="bookDetailContent"></div>
+    </div>
+
+    <!-- Page: Subscription -->
+    <div class="page" id="page-subscription" role="tabpanel" aria-label="الاشتراك">
+      <div id="subscriptionContent"><div class="loading"><div class="spinner"></div> جارٍ التحميل...</div></div>
+    </div>
+
+    <!-- Page: Admin -->
+    <div class="page" id="page-admin" role="tabpanel" aria-label="الإدارة">
+      <div id="adminContent"></div>
+    </div>
+  </main>
+
+  <!-- Player Bar -->
+  <div class="player-bar" id="playerBar" role="region" aria-label="شريط التشغيل">
+    <img class="pb-cover" id="pbCover" src="" alt="غلاف الكتاب">
+    <div class="pb-info">
+      <div class="pb-title" id="pbTitle">عنوان الكتاب</div>
+      <div class="pb-author" id="pbAuthor">المؤلف</div>
+    </div>
+    <div class="pb-progress-wrapper">
+      <div class="pb-progress">
+        <input type="range" id="pbSeek" min="0" max="100" value="0" step="0.1" aria-label="شريط التقدم">
+      </div>
+      <div class="pb-time">
+        <span id="pbCurrent">00:00</span> / <span id="pbDuration">00:00</span>
+      </div>
+    </div>
+    <div class="pb-controls">
+      <button id="pbBack" class="pb-skip-btn" aria-label="رجوع 10 ثواني" title="رجوع 10 ثواني">
+        <span class="skip-icon">↩</span><span class="skip-num">10</span>
+      </button>
+      <button id="pbPlay" class="play-btn" aria-label="تشغيل / إيقاف مؤقت">▶</button>
+      <button id="pbForward" class="pb-skip-btn" aria-label="تقديم 10 ثواني" title="تقديم 10 ثواني">
+        <span class="skip-icon">↪</span><span class="skip-num">10</span>
+      </button>
+    </div>
+    <div class="pb-extra-controls">
+      <button id="pbSpeed" aria-label="سرعة التشغيل">1×</button>
+      <button id="pbVolume" aria-label="الصوت">🔊</button>
+    </div>
+    <div class="pb-protection" id="pbProtection" style="display:none">
+      <span aria-hidden="true">🛡️</span> الحماية نشطة
+    </div>
+  </div>
+
+  <!-- Auth Modal -->
+  <div class="modal-overlay" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="authModalTitle" tabindex="-1">تسجيل الدخول</h2>
+        <button class="modal-close" id="authModalClose" aria-label="إغلاق">✕</button>
+      </div>
+      <div id="authFormContainer">
+        <!-- Login Form -->
+        <form id="loginForm" novalidate>
+          <div class="form-group">
+            <label for="loginEmail">البريد الإلكتروني</label>
+            <input type="email" id="loginEmail" placeholder="hamzaAboslema@kitabi.app" required autocomplete="email" aria-required="true">
+          </div>
+          <div class="form-group">
+            <label for="loginPassword">كلمة المرور</label>
+            <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password" aria-required="true">
+          </div>
+          <button type="submit" class="btn-primary" style="width:100%;justify-content:center;padding:14px">تسجيل الدخول</button>
+          <div class="form-footer">
+            ليس لديك حساب؟ <a id="showRegister" role="button" tabindex="0" aria-label="إنشاء حساب جديد">إنشاء حساب جديد</a>
+          </div>
+        </form>
+        <!-- Register Form -->
+        <form id="registerForm" style="display:none" novalidate>
+          <div class="form-group">
+            <label for="regName">الاسم</label>
+            <input type="text" id="regName" placeholder="الاسم الكامل" required autocomplete="name" aria-required="true">
+          </div>
+          <div class="form-group">
+            <label for="regEmail">البريد الإلكتروني</label>
+            <input type="email" id="regEmail" placeholder="example@email.com" required autocomplete="email" aria-required="true">
+          </div>
+          <div class="form-group">
+            <label for="regPassword">كلمة المرور</label>
+            <input type="password" id="regPassword" placeholder="●●●●●●●●" required minlength="6" autocomplete="new-password" aria-required="true">
+          </div>
+          <button type="submit" class="btn-primary" style="width:100%;justify-content:center;padding:14px">إنشاء حساب</button>
+          <div class="form-footer">
+            لديك حساب بالفعل؟ <a id="showLogin" role="button" tabindex="0" aria-label="تسجيل الدخول">تسجيل الدخول</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+  <script src="/js/audio-engine.js"></script>
+  <script src="/js/detection-engine.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+  </script>
+</body>
+</html>

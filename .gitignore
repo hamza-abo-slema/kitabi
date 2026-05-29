@@ -1,0 +1,18 @@
+node_modules/
+kitabi.db
+server.log
+server_err.log
+*.db
+build/
+*.spec
+*.pyc
+__pycache__/
+.DS_Store
+*.exe
+kitabi app/
+Kitabi_Setup_*.exe
+.env
+/audio/
+/uploads/
+public/uploads/*.wav
+جزء من رأس ميدوسا.mp3
