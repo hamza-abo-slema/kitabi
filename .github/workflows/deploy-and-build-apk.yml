@@ -39,51 +39,38 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install Bubblewrap and build APK
+      - name: Install Bubblewrap
+        run: sudo npm install -g @pwabuilder/bubblewrap
+
+      - name: Init TWA project
         env:
           BUBBLEWRAP_KEYSTORE_PASSWORD: android
           BUBBLEWRAP_KEY_PASSWORD: android
         run: |
           URL="${{ steps.url.outputs.url }}"
           MANIFEST="${URL}/manifest.json"
-
-          mkdir -p app
-          cd app
-
-          # Install bubblewrap without sudo
-          npm config set prefix $HOME/.npm-global
-          export PATH=$HOME/.npm-global/bin:$PATH
-          echo "$HOME/.npm-global/bin" >> $GITHUB_PATH
-
-          npm install -g @pwabuilder/bubblewrap 2>&1 || {
-            echo "npm install failed, trying npx..."
-            npx @pwabuilder/bubblewrap --version 2>&1
-          }
-
-          # Check what's available
-          which bubblewrap 2>/dev/null || echo "Not in PATH"
-          ls $HOME/.npm-global/bin/ 2>/dev/null
-
-          # Try init with multiple approaches
-          bubblewrap init \
-            --manifest "$MANIFEST" \
-            --appVersionName "1.0" \
-            --appVersionCode 1 \
-            --directory . 2>&1 || \
+          mkdir -p twa-project
+          cd twa-project
           npx @pwabuilder/bubblewrap init \
             --manifest "$MANIFEST" \
             --appVersionName "1.0" \
-            --appVersionCode 1 \
-            --directory . 2>&1 || \
-          echo "Init failed, creating project manually..."
+            --appVersionCode 1 2>&1 || \
+          bubblewrap init \
+            --manifest "$MANIFEST" \
+            --appVersionName "1.0" \
+            --appVersionCode 1 2>&1
 
+      - name: Build APK
+        env:
+          BUBBLEWRAP_KEYSTORE_PASSWORD: android
+          BUBBLEWRAP_KEY_PASSWORD: android
+        run: |
+          cd twa-project || mkdir -p twa-project && cd twa-project
           ls -la
-
-          if [ -f "twa-manifest.json" ]; then
-            bubblewrap build --skipSigning 2>&1 || \
-            npx @pwabuilder/bubblewrap build --skipSigning 2>&1 || true
-          fi
-
+          # Try building
+          npx @pwabuilder/bubblewrap build --skipSigning 2>&1 || \
+          bubblewrap build --skipSigning 2>&1 || \
+          echo "Build command failed"
           mkdir -p ../final-apk
           find . -name "*.apk" -exec cp {} ../final-apk/ \; 2>/dev/null
           ls -la ../final-apk/ 2>/dev/null || echo "No APK found"
